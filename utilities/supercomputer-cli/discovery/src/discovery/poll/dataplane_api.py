@@ -397,6 +397,16 @@ def _log_diff(old_logs: list[str], new_logs: list[str]) -> list[str]:
     return new_logs[len(old_logs) :]
 
 
+def _spinner_frames(encoding: str | None) -> itertools.cycle[str]:
+    """Return spinner frames supported by the active output encoding."""
+    frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+    try:
+        "".join(frames).encode(encoding or "utf-8")
+    except (LookupError, UnicodeEncodeError):
+        frames = ["|", "/", "-", "\\"]
+    return itertools.cycle(frames)
+
+
 def get_operation_status(
     project_name: str,
     operation_id: str,
@@ -457,7 +467,7 @@ def poll_operation(
     attempt = 0
     old_logs: list[str] = []
     old_runtime_details = ""
-    spinner = itertools.cycle(["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
+    spinner = _spinner_frames(sys.stdout.encoding)
 
     while True:
         attempt += 1

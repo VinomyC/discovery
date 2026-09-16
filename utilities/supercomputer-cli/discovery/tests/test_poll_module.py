@@ -52,6 +52,12 @@ def test_log_diff_returns_new_entries() -> None:
     assert dataplane_api._log_diff(old, new) == ["c", "d"]
 
 
+def test_spinner_frames_uses_ascii_when_encoding_does_not_support_braille() -> None:
+    spinner = dataplane_api._spinner_frames("cp1252")
+
+    assert next(spinner) == "|"
+
+
 def test_extract_tool_report_logs_from_dict(sample_response_dict: dict[str, Any]) -> None:
     report_dict = sample_response_dict["result"]["toolReport"]
     logs = dataplane_api._extract_tool_report_logs(report_dict)
