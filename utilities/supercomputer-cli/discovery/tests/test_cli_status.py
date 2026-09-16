@@ -528,6 +528,36 @@ def test_non_running_op_does_not_query_pods() -> None:
 
 
 @pytest.mark.usefixtures("_stub_status_env")
+def test_running_op_at_narrow_width_renders_complete_runtime_details() -> None:
+    runtime_details = (
+        "Pending: a node scale-up attempt did not complete; scheduling will retry."
+    )
+    operation = _fake_op_status("Running")
+    operation.result.runtime_details = runtime_details
+
+    with (
+        patch(
+            "discovery.poll.cli_status.get_operation_status",
+            return_value=operation,
+        ),
+        patch(
+            "discovery.poll.cli_status.get_operation_pods",
+            return_value=None,
+        ),
+    ):
+        runner = CliRunner()
+        result = runner.invoke(
+            status_app,
+            ["status", "op-xyz"],
+            env={"COLUMNS": "80"},
+        )
+
+    normalized_output = " ".join(result.output.split())
+    assert result.exit_code == 0, result.output
+    assert runtime_details in normalized_output
+
+
+@pytest.mark.usefixtures("_stub_status_env")
 def test_pods_fetch_failure_does_not_break_status() -> None:
     with (
         patch(

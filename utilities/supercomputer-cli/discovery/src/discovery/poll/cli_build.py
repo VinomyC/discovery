@@ -409,6 +409,7 @@ def _ensure_storage_assets_and_containers(
     )
 
     storage_container_resource_id = env_cfg.storagecontainer_id
+    failures: list[str] = []
 
     for asset_name in asset_names:
         # The storage asset's path has format "<container_name>[/<subpath>]";
@@ -444,6 +445,7 @@ def _ensure_storage_assets_and_containers(
                 info(f"Storage asset '{asset_name}' already exists")
         except Exception as ex:
             error(f"Failed to ensure storage asset '{asset_name}': {ex}")
+            failures.append(f"storage asset '{asset_name}'")
 
         if not is_blob_backed:
             continue
@@ -473,6 +475,12 @@ def _ensure_storage_assets_and_containers(
                 info(f"Blob container '{asset_name}' already exists")
         except Exception as ex:
             error(f"Failed to ensure blob container '{asset_name}': {ex}")
+            failures.append(f"blob container '{asset_name}'")
+
+    if failures:
+        failed_resources = ", ".join(failures)
+        msg = f"Archive verification failed for: {failed_resources}"
+        raise RuntimeError(msg)
 
     if is_blob_backed:
         typer.secho("✓ Storage assets and blob containers verified", fg=typer.colors.GREEN)

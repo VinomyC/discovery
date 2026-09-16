@@ -13,6 +13,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.status import Status
 from rich.table import Table
+from rich.text import Text
 
 from discovery.common.job_history import (
     load_history,
@@ -657,7 +658,6 @@ def status_cmd(
             table.add_column("Completed (Local)", style="magenta")
             table.add_column("Runtime", style="bright_cyan")
             table.add_column("Status", style="green")
-            table.add_column("Runtime Details", style="cyan")
 
             # Get created_at from result if available
             if result.result and result.result.created_at:
@@ -682,15 +682,17 @@ def status_cmd(
                         in_progress=True,
                     )
 
-            runtime_details = (
-                result.result.runtime_details
-                if result.result and result.result.runtime_details
-                else ""
-            )
-
-            table.add_row(formatted_time, completed_time, runtime_str, result.status, runtime_details)
+            table.add_row(formatted_time, completed_time, runtime_str, result.status)
 
             console.print(table)
+            if result.result and result.result.runtime_details:
+                console.print(
+                    Panel(
+                        Text(result.result.runtime_details),
+                        title="Runtime Details",
+                        border_style="cyan",
+                    )
+                )
 
             # Display pods table for Running operations (preview endpoint).
             # Best-effort: silently skip on 404/transport errors so CLIs

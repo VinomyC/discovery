@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from typing import TYPE_CHECKING
 
 import typer
@@ -12,6 +11,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from discovery.common.logging import debug, info
+from discovery.poll.azcli import run_az
 from discovery.poll.build_acr_task import get_acr_login_server, list_acr_names
 from discovery.poll.models.api_version import ApiVersion
 
@@ -418,7 +418,7 @@ def _resolve_workspace_uami(env_cfg: EnvConfig) -> str:
     sub = env_cfg.subscription
     if sub:
         cmd.extend(["--subscription", sub])
-    res = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    res = run_az(cmd)
     if res.returncode == 0:
         return (res.stdout or "").strip()
     return ""
@@ -437,7 +437,7 @@ def _resolve_workspace_region(env_cfg: EnvConfig) -> str:
     sub = env_cfg.subscription
     if sub:
         cmd.extend(["--subscription", sub])
-    res = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    res = run_az(cmd)
     if res.returncode == 0:
         return (res.stdout or "").strip()
     return ""
@@ -809,7 +809,7 @@ def _create_scratch_dc_interactive(
         ]
         if subscription:
             cmd.extend(["--subscription", subscription])
-        res = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        res = run_az(cmd)
         anf_vnet = ""
         if res.returncode == 0:
             anf_vnet = extract_vnet_id((res.stdout or "").strip())
@@ -936,7 +936,7 @@ def _resolve_scratch_dc_candidates(subscription: str) -> list[dict]:
             ]
             if subscription:
                 cmd.extend(["--subscription", subscription])
-            res = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            res = run_az(cmd)
             if res.returncode == 0 and res.stdout.strip():
                 try:
                     payload = json.loads(res.stdout)
@@ -1000,7 +1000,7 @@ def _create_scratch_sc_interactive(
         ]
         if subscription:
             cmd.extend(["--subscription", subscription])
-        res = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        res = run_az(cmd)
         vol_vnet = ""
         if res.returncode == 0:
             vol_vnet = extract_vnet_id((res.stdout or "").strip())
@@ -1106,7 +1106,7 @@ def _resolve_scratch_sc_candidates(subscription: str) -> list[dict]:
             ]
             if subscription:
                 cmd.extend(["--subscription", subscription])
-            res = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            res = run_az(cmd)
             if res.returncode == 0 and res.stdout.strip():
                 try:
                     payload = json.loads(res.stdout)

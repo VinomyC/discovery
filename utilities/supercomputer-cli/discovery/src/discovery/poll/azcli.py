@@ -31,6 +31,9 @@ def run_az(cmd: list[str]) -> subprocess.CompletedProcess[str]:
     Callers continue to inspect ``returncode`` / ``stderr`` exactly as they
     would for a regular :func:`subprocess.run` call.
     """
+    if os.name == "nt" and cmd and cmd[0] == "az":
+        cmd = ["az.cmd", *cmd[1:]]
+
     env = {**os.environ, "AZURE_EXTENSION_USE_DYNAMIC_INSTALL": "no"}
     return subprocess.run(
         cmd,

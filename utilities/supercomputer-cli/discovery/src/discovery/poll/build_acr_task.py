@@ -31,6 +31,8 @@ from textwrap import dedent
 
 import typer
 
+from discovery.poll.azcli import run_az as run_az_command
+
 from .vscode_layer import prepare_vscode_layer
 
 
@@ -55,7 +57,7 @@ def run_az(args: list[str]) -> subprocess.CompletedProcess:
     Does not raise; caller interprets returncode.
     """
     try:
-        return subprocess.run(["az", *args], capture_output=True, text=True, check=False)
+        return run_az_command(["az", *args])
     except OSError as ex:  # pragma: no cover
         typer.secho(f"Failed invoking az: {ex}", fg=typer.colors.RED, err=True)
         raise typer.Exit(4) from ex

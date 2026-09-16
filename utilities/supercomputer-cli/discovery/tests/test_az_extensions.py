@@ -6,7 +6,7 @@ import subprocess as sp
 
 import pytest
 
-from discovery.poll import az_extensions
+from discovery.poll import az_extensions, azcli
 from discovery.poll.azcli import run_az
 
 
@@ -27,6 +27,13 @@ def _unexpected_command(cmd: list[str]) -> AssertionError:
     """
     msg = f"unexpected command: {cmd}"
     return AssertionError(msg)
+
+
+def _normalized_az_command(cmd: list[str]) -> list[str]:
+    """Normalize the platform-specific Azure CLI launcher for assertions."""
+    if cmd and cmd[0] == "az.cmd":
+        return ["az", *cmd[1:]]
+    return cmd
 
 
 # ---------------------------------------------------------------------------
@@ -111,7 +118,7 @@ def test_ensure_extension_already_installed(monkeypatch: pytest.MonkeyPatch) -> 
     assert r.action == "already-installed"
     # Only the show probe should have been invoked, never `extension add`.
     assert len(calls) == 1
-    assert calls[0][:3] == ["az", "extension", "show"]
+    assert _normalized_az_command(calls[0])[:3] == ["az", "extension", "show"]
 
 
 def test_ensure_extension_installs_when_missing(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -122,10 +129,11 @@ def test_ensure_extension_installs_when_missing(monkeypatch: pytest.MonkeyPatch)
 
     def fake_run(cmd, *a, **kw):
         calls.append(list(cmd))
-        if cmd[:3] == ["az", "extension", "show"]:
+        normalized_cmd = _normalized_az_command(cmd)
+        if normalized_cmd[:3] == ["az", "extension", "show"]:
             rc = next(show_states)
             return _make_proc(returncode=rc, stdout="{}" if rc == 0 else "")
-        if cmd[:3] == ["az", "extension", "add"]:
+        if normalized_cmd[:3] == ["az", "extension", "add"]:
             return _make_proc(returncode=0, stdout="installed")
         raise _unexpected_command(cmd)
 
@@ -134,7 +142,7 @@ def test_ensure_extension_installs_when_missing(monkeypatch: pytest.MonkeyPatch)
     assert r.ok is True
     assert r.action == "installed"
     # Sequence: show (miss) → add → show (hit).
-    cmds = [c[:3] for c in calls]
+    cmds = [_normalized_az_command(c)[:3] for c in calls]
     assert cmds == [
         ["az", "extension", "show"],
         ["az", "extension", "add"],
@@ -150,9 +158,10 @@ def test_ensure_extension_install_failure_is_reported(monkeypatch: pytest.Monkey
     """A failed install yields a structured ExtensionResult, not a raise."""
 
     def fake_run(cmd, *a, **kw):
-        if cmd[:3] == ["az", "extension", "show"]:
+        normalized_cmd = _normalized_az_command(cmd)
+        if normalized_cmd[:3] == ["az", "extension", "show"]:
             return _make_proc(returncode=1)
-        if cmd[:3] == ["az", "extension", "add"]:
+        if normalized_cmd[:3] == ["az", "extension", "add"]:
             return _make_proc(returncode=2, stderr="HTTP 503 from extension index")
         raise _unexpected_command(cmd)
 
@@ -173,9 +182,10 @@ def test_ensure_extension_install_succeeds_but_show_still_misses(
     # Both show probes return missing; add returns success.
 
     def fake_run(cmd, *a, **kw):
-        if cmd[:3] == ["az", "extension", "show"]:
+        normalized_cmd = _normalized_az_command(cmd)
+        if normalized_cmd[:3] == ["az", "extension", "show"]:
             return _make_proc(returncode=1)
-        if cmd[:3] == ["az", "extension", "add"]:
+        if normalized_cmd[:3] == ["az", "extension", "add"]:
             return _make_proc(returncode=0)
         raise _unexpected_command(cmd)
 
@@ -199,9 +209,10 @@ def test_ensure_extension_failure_detail_keeps_stderr_tail(
     stderr = long_prefix + helpful_tail
 
     def fake_run(cmd, *a, **kw):
-        if cmd[:3] == ["az", "extension", "show"]:
+        normalized_cmd = _normalized_az_command(cmd)
+        if normalized_cmd[:3] == ["az", "extension", "show"]:
             return _make_proc(returncode=1)
-        if cmd[:3] == ["az", "extension", "add"]:
+        if normalized_cmd[:3] == ["az", "extension", "add"]:
             return _make_proc(returncode=2, stderr=stderr)
         raise _unexpected_command(cmd)
 
@@ -250,12 +261,13 @@ def test_ensure_required_extensions_aggregates_per_name(
     def fake_run(cmd, *a, **kw):
         # We don't track per-name state across calls — instead let the
         # first show succeed and the second show fail and add fail.
-        if cmd[:3] == ["az", "extension", "show"]:
+        normalized_cmd = _normalized_az_command(cmd)
+        if normalized_cmd[:3] == ["az", "extension", "show"]:
             state["i"] += 1
             if state["i"] == 1:
                 return _make_proc(returncode=0)  # "foo": installed
             return _make_proc(returncode=1)  # "bar": missing, then re-check missing
-        if cmd[:3] == ["az", "extension", "add"]:
+        if normalized_cmd[:3] == ["az", "extension", "add"]:
             return _make_proc(returncode=2, stderr="boom")
         raise _unexpected_command(cmd)
 
@@ -309,3 +321,20 @@ def test_run_az_passes_devnull_stdin_and_disables_dynamic_install(
     assert captured["kwargs"].get("capture_output") is True
     assert captured["kwargs"].get("text") is True
     assert captured["kwargs"].get("check") is False
+
+
+def test_run_az_uses_batch_launcher_on_windows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict = {}
+
+    def fake_run(cmd, *args, **kwargs):
+        captured["cmd"] = cmd
+        return _make_proc(returncode=0, stdout="{}")
+
+    monkeypatch.setattr(azcli.os, "name", "nt")
+    monkeypatch.setattr(azcli.subprocess, "run", fake_run)
+
+    run_az(["az", "account", "show"])
+
+    assert captured["cmd"] == ["az.cmd", "account", "show"]

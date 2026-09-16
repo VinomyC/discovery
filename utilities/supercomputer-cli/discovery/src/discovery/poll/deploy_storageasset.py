@@ -16,7 +16,6 @@ Follows the same pattern as deploy_dataasset.py for consistency.
 from __future__ import annotations
 
 import json
-import subprocess
 import tempfile
 from datetime import datetime, timezone
 from importlib.resources import files
@@ -26,6 +25,7 @@ from typing import Any
 import typer
 
 from discovery.common.logging import debug, error, info
+from discovery.poll.azcli import run_az
 
 from .models.arm_versions import STORAGEASSET_ARM_API_VERSION
 from .models.dataasset import StorageAssetInputs
@@ -102,7 +102,7 @@ def check_storageasset_exists(
     debug(f"check_storageasset_exists(): executing {' '.join(cmd)}")
 
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        res = run_az(cmd)
     except OSError as exc:
         msg = "Azure CLI 'az' not found while checking storage asset"
         raise RuntimeError(msg) from exc
@@ -219,7 +219,7 @@ def deploy_storageasset(
 
         typer.secho(f"Deploying storage asset '{inputs.name}'...", fg=typer.colors.GREEN)
 
-        proc = subprocess.run(real_cmd, text=True, check=False)
+        proc = run_az(real_cmd)
 
         if proc.returncode != 0:
             typer.secho("Storage asset deployment failed", fg=typer.colors.RED, err=True)

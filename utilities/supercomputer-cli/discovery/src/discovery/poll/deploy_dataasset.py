@@ -12,7 +12,6 @@ Follows the same pattern as deploy_tooldef.py for consistency.
 from __future__ import annotations
 
 import json
-import subprocess
 import tempfile
 from datetime import datetime, timezone
 from importlib.resources import files
@@ -22,6 +21,7 @@ from typing import Any
 import typer
 
 from discovery.common.logging import debug, error, info
+from discovery.poll.azcli import run_az
 
 from .models.dataasset import BlobContainerInputs, DataAssetInputs
 
@@ -93,7 +93,7 @@ def check_dataasset_exists(
     debug(f"check_dataasset_exists(): executing {' '.join(cmd)}")
 
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        res = run_az(cmd)
     except OSError as exc:
         msg = "Azure CLI 'az' not found while checking data asset"
         raise RuntimeError(msg) from exc
@@ -217,7 +217,7 @@ def deploy_dataasset(
         typer.secho(f"Deploying data asset '{inputs.name}'...", fg=typer.colors.GREEN)
 
         # Stream output in real-time
-        proc = subprocess.run(real_cmd, text=True, check=False)
+        proc = run_az(real_cmd)
 
         if proc.returncode != 0:
             typer.secho("Data asset deployment failed", fg=typer.colors.RED, err=True)
@@ -270,7 +270,7 @@ def check_blob_container_exists(
     debug(f"check_blob_container_exists(): executing {' '.join(cmd)}")
 
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        res = run_az(cmd)
     except OSError as exc:
         msg = "Azure CLI 'az' not found while checking blob container"
         raise RuntimeError(msg) from exc
@@ -370,7 +370,7 @@ def deploy_blob_container(
     typer.secho(f"Creating blob container '{inputs.container_name}'...", fg=typer.colors.GREEN)
 
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        res = run_az(cmd)
     except OSError as exc:
         msg = "Azure CLI 'az' not found while creating blob container"
         raise RuntimeError(msg) from exc
