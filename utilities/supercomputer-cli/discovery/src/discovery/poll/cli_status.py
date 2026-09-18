@@ -13,7 +13,6 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.status import Status
 from rich.table import Table
-from rich.text import Text
 
 from discovery.common.job_history import (
     load_history,
@@ -450,7 +449,7 @@ async def _paginated_list(
 
     while True:
         # Collect up to page_size matching results
-        batch: list[tuple[str, str, str, str | None, str, str]] = []
+        batch: list[tuple[str, str, str, str, str | None, str, str, str]] = []
 
         while len(batch) < page_size:
             # Check limit on total results searched
@@ -500,7 +499,18 @@ async def _paginated_list(
                     # Resolve nodepool_id to friendly sc/pool name
                     raw_pool = op.nodepool_id or ""
                     pool_name = pool_display.get(raw_pool) or pool_display.get(raw_pool.split("/")[-1], raw_pool.split("/")[-1])
-                    batch.append((op.id, formatted_time, completed_time, runtime_str, op.created_by, pool_name, op.status))
+                    batch.append(
+                        (
+                            op.id,
+                            formatted_time,
+                            completed_time,
+                            runtime_str,
+                            op.created_by,
+                            pool_name,
+                            op.status,
+                            op.runtime_details or "",
+                        )
+                    )
 
                     # ID-based early-exit: every target accounted for.
                     if target_ids is not None and matches_seen >= target_ids:
@@ -568,6 +578,7 @@ async def _paginated_list(
         table.add_column("Owner", style="bright_black")
         table.add_column("Pool", style="yellow")
         table.add_column("Status", style="green")
+        table.add_column("Runtime Details", overflow="fold", ratio=2)
 
         for row in batch:
             table.add_row(*row)
@@ -658,6 +669,7 @@ def status_cmd(
             table.add_column("Completed (Local)", style="magenta")
             table.add_column("Runtime", style="bright_cyan")
             table.add_column("Status", style="green")
+            table.add_column("Runtime Details", style="cyan")
 
             # Get created_at from result if available
             if result.result and result.result.created_at:
@@ -682,17 +694,15 @@ def status_cmd(
                         in_progress=True,
                     )
 
-            table.add_row(formatted_time, completed_time, runtime_str, result.status)
+            runtime_details = (
+                result.result.runtime_details
+                if result.result and result.result.runtime_details
+                else ""
+            )
+
+            table.add_row(formatted_time, completed_time, runtime_str, result.status, runtime_details)
 
             console.print(table)
-            if result.result and result.result.runtime_details:
-                console.print(
-                    Panel(
-                        Text(result.result.runtime_details),
-                        title="Runtime Details",
-                        border_style="cyan",
-                    )
-                )
 
             # Display pods table for Running operations (preview endpoint).
             # Best-effort: silently skip on 404/transport errors so CLIs

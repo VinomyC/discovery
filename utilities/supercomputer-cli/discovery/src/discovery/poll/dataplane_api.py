@@ -15,6 +15,7 @@ import atexit
 import itertools
 import json as _json
 import statistics
+import subprocess
 import sys
 import time
 from collections import defaultdict
@@ -44,7 +45,6 @@ _TRANSIENT_NETWORK_ERRORS = (
 )
 
 from discovery.common.logging import debug, info
-from discovery.poll.azcli import run_az
 from discovery.poll.models.auth import AuthHeaders
 from discovery.poll.models.compute import ComputeUsageModel
 from discovery.poll.models.tool_response import (
@@ -350,7 +350,7 @@ def get_access_token(scope: str = DEFAULT_SCOPE) -> str:
         "--output",
         "json",
     ]
-    result = run_az(cmd)
+    result = subprocess.run(cmd, check=False, capture_output=True, text=True)
     if result.returncode != 0:
         msg = f"Failed to get access token: {result.stderr.strip()}"
         raise PollError(msg)
@@ -395,16 +395,6 @@ def start_tool_run(
 
 def _log_diff(old_logs: list[str], new_logs: list[str]) -> list[str]:
     return new_logs[len(old_logs) :]
-
-
-def _spinner_frames(encoding: str | None) -> itertools.cycle[str]:
-    """Return spinner frames supported by the active output encoding."""
-    frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
-    try:
-        "".join(frames).encode(encoding or "utf-8")
-    except (LookupError, UnicodeEncodeError):
-        frames = ["|", "/", "-", "\\"]
-    return itertools.cycle(frames)
 
 
 def get_operation_status(
@@ -467,7 +457,7 @@ def poll_operation(
     attempt = 0
     old_logs: list[str] = []
     old_runtime_details = ""
-    spinner = _spinner_frames(sys.stdout.encoding)
+    spinner = itertools.cycle(["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
 
     while True:
         attempt += 1

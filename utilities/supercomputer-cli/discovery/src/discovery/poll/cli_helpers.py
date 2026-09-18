@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -12,7 +13,6 @@ import typer
 
 from discovery.common.logging import debug, error, info, pretty_debug
 from discovery.common.paths import get_config_file_path  # re-exported for backward compat
-from discovery.poll.azcli import run_az
 from discovery.poll.models.config import EnvConfig
 
 from .selection import select_archive, select_project_and_related, select_tool
@@ -152,7 +152,7 @@ def get_raw_azure_username() -> str:
     debug(f"Getting Azure username: {' '.join(cmd)}")
 
     try:
-        result = run_az(cmd)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
         if result.returncode != 0:
             error(f"Failed to get Azure username: {result.stderr.strip()}")
             msg = "Could not determine Azure username. Ensure you are logged in with 'az login'."
@@ -222,7 +222,7 @@ def get_location_from_supercomputer(env_cfg: EnvConfig) -> str | None:
             "-o",
             "tsv",
         ]
-        result = run_az(cmd)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
         if result.returncode == 0 and result.stdout.strip():
             location = result.stdout.strip()
             debug(f"Using location '{location}' from supercomputer")
